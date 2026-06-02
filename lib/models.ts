@@ -1,16 +1,10 @@
-// Bundled base models the user can dress. These ship as stylized silhouette
-// placeholders; for the most realistic AI try-on, users can upload a real
-// front-facing photo of a person on a plain background instead.
+// Base model the garments are placed on.
+//
+// Default is a sentinel ("mannequin") rather than an image: the AI invents a
+// neutral mannequin from the first garment, so we don't ship/send a base image.
+// Users can instead upload a real front-facing photo (a data URL) for try-on on
+// an actual person.
 
-export interface BaseModel {
-  id: string;
-  label: string;
-  src: string; // path under public/
-}
+export const MANNEQUIN = "mannequin";
 
-export const BASE_MODELS: BaseModel[] = [
-  { id: "neutral-a", label: "Mannequin A", src: "/models/mannequin-a.svg" },
-  { id: "neutral-b", label: "Mannequin B", src: "/models/mannequin-b.svg" },
-];
-
-export const DEFAULT_BASE_MODEL = BASE_MODELS[0].src;
+export const DEFAULT_BASE_MODEL = MANNEQUIN;

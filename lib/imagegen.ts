@@ -93,22 +93,38 @@ function toDataUrl(img: ImageInput): string {
   return `data:${img.mimeType};base64,${img.data}`;
 }
 
-function promptFor(type: GarmentType, label: string): string {
-  const article: Record<GarmentType, string> = {
-    top: "top / shirt",
-    bottom: "pair of bottoms (pants/skirt)",
-    dress: "dress",
-    jacket: "jacket / outerwear, layered on top of any existing clothing",
-    tie: "necktie, worn over the shirt",
-    shoes: "pair of shoes",
-    accessory: "accessory",
-  };
+const ARTICLE: Record<GarmentType, string> = {
+  top: "top / shirt",
+  bottom: "pair of bottoms (pants/skirt)",
+  dress: "dress",
+  jacket: "jacket / outerwear, layered on top of any existing clothing",
+  tie: "necktie, worn over the shirt",
+  shoes: "pair of shoes",
+  accessory: "accessory",
+};
+
+function describe(type: GarmentType, label: string): string {
+  return `${ARTICLE[type]}${label ? ` ("${label}")` : ""}`;
+}
+
+/** First step when there's no base image: create a mannequin already wearing the garment. */
+function createOnMannequinPrompt(type: GarmentType, label: string): string {
   return [
-    `You are a virtual try-on tool. The first image is a person.`,
-    `The second image is a ${article[type]}${label ? ` ("${label}")` : ""}.`,
-    `Generate a new image of the same person realistically wearing that ${type}, fitted to their body and pose and layered correctly over anything they already wear.`,
-    `Keep the exact same person, face, body, pose, camera framing, lighting, and plain background.`,
-    `Return the edited image.`,
+    `Generate a single photorealistic, full-length image of a plain, faceless, neutral light-gray display mannequin standing front-facing on a seamless studio background.`,
+    `The image provided is a ${describe(type, label)}.`,
+    `Dress the mannequin in that ${type}, fitted naturally to its body. Show the full figure from head to feet.`,
+    `Output only the image.`,
+  ].join(" ");
+}
+
+/** Subsequent steps: layer the next garment onto the current composite. */
+function layerPrompt(type: GarmentType, label: string): string {
+  return [
+    `The first image shows a mannequin (it may already be wearing some clothing).`,
+    `The second image is a ${describe(type, label)}.`,
+    `Edit the first image so the same mannequin also wears that ${type}, fitted to its body and layered correctly over anything it already wears.`,
+    `Keep the exact same mannequin, pose, camera framing, lighting, and plain background.`,
+    `Output only the edited image.`,
   ].join(" ");
 }
 
@@ -179,13 +195,33 @@ export async function composeOutfit(
   }
 
   const apiKey = process.env.OPENROUTER_API_KEY!;
-  let currentDataUrl = toDataUrl(await loadImage(baseModelSrc));
+  // A real photo base is an image source; the default "mannequin" sentinel is not,
+  // so we ask the model to invent the mannequin from the first garment instead.
+  const hasBaseImage = /^(data:|https?:|\/)/.test(baseModelSrc);
+  let currentDataUrl: string | null = hasBaseImage
+    ? toDataUrl(await loadImage(baseModelSrc))
+    : null;
   let totalTokens = 0;
   let costUsd = 0;
   let costSeen = false;
 
   for (const garment of garments) {
     const garmentImg = await loadImage(garment.imageUrl);
+
+    // No current image yet (default mannequin, first garment): generate the
+    // mannequin wearing this garment from text + the garment image alone.
+    const content =
+      currentDataUrl === null
+        ? [
+            { type: "text", text: createOnMannequinPrompt(garment.type, garment.label) },
+            { type: "image_url", image_url: { url: toDataUrl(garmentImg) } },
+          ]
+        : [
+            { type: "text", text: layerPrompt(garment.type, garment.label) },
+            { type: "image_url", image_url: { url: currentDataUrl } },
+            { type: "image_url", image_url: { url: toDataUrl(garmentImg) } },
+          ];
+
     const res = await fetch(OPENROUTER_URL, {
       method: "POST",
       headers: {
@@ -197,16 +233,7 @@ export async function composeOutfit(
         model: modelCfg.id,
         modalities: modelCfg.modalities,
         usage: { include: true },
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: promptFor(garment.type, garment.label) },
-              { type: "image_url", image_url: { url: currentDataUrl } },
-              { type: "image_url", image_url: { url: toDataUrl(garmentImg) } },
-            ],
-          },
-        ],
+        messages: [{ role: "user", content }],
       }),
     });
 
@@ -227,6 +254,10 @@ export async function composeOutfit(
       );
     }
     currentDataUrl = next;
+  }
+
+  if (currentDataUrl === null) {
+    throw new Error("Add at least one garment to generate an outfit.");
   }
 
   return {

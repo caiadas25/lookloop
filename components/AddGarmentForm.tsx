@@ -31,7 +31,7 @@ const PRIMARY_CARDS: { type: GarmentType; label: string; icon: string }[] = [
 /** Secondary options shown when "Other" is expanded. */
 const OTHER_CARDS: { type: GarmentType; label: string; icon: string }[] = [
   { type: "dress", label: "Dress", icon: "👗" },
-  { type: "tie", label: "Tie", icon: "🎀" },
+  { type: "tie", label: "Tie", icon: "👔" },
   { type: "hat", label: "Hat", icon: "🧢" },
   { type: "accessory", label: "Accessory", icon: "💍" },
 ];

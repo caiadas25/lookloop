@@ -19,12 +19,12 @@ export async function GET() {
   try {
     // Scan for all waitlist email keys
     const keys: string[] = [];
-    let cursor = 0;
+    let cursor = "0";
     do {
       const result = await kv.scan(cursor, { match: "waitlist:*", count: 100 });
       cursor = result[0];
       keys.push(...result[1]);
-    } while (cursor !== 0);
+    } while (cursor !== "0");
 
     // Filter out the count key and fetch each email's timestamp
     const emailKeys = keys.filter((k) => k !== "waitlist:count");

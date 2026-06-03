@@ -3,13 +3,11 @@
 import { useState } from "react";
 import AddGarmentForm from "@/components/AddGarmentForm";
 import GarmentCard from "@/components/GarmentCard";
-import BaseModelPicker from "@/components/BaseModelPicker";
 import ResultPanel from "@/components/ResultPanel";
 import { sortByLayer, type Garment, type GarmentType } from "@/lib/garments";
-import { DEFAULT_BASE_MODEL } from "@/lib/models";
+import { MANNEQUIN } from "@/lib/models";
 export default function Home() {
   const [garments, setGarments] = useState<Garment[]>([]);
-  const [baseModel, setBaseModel] = useState<string>(DEFAULT_BASE_MODEL);
   const [image, setImage] = useState<string | null>(null);
   const [usage, setUsage] = useState<{
     requests: number;
@@ -50,7 +48,7 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          baseModel,
+          baseModel: MANNEQUIN,
           garments: garments.map((g) => ({
             imageUrl: g.imageUrl,
             type: g.type,
@@ -86,7 +84,6 @@ export default function Home() {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
         {/* Left column: controls */}
         <div className="flex flex-col gap-4">
-          <BaseModelPicker selected={baseModel} onSelect={setBaseModel} />
           <AddGarmentForm onAdd={addGarment} />
 
           {garments.length > 0 && (

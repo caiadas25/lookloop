@@ -1,138 +1,134 @@
 "use client";
 
 import { useState } from "react";
-import AddGarmentForm from "@/components/AddGarmentForm";
-import GarmentCard from "@/components/GarmentCard";
-import ResultPanel from "@/components/ResultPanel";
-import DebugPanel from "@/components/DebugPanel";
-import { sortByLayer, type Garment, type GarmentType } from "@/lib/garments";
-import { MANNEQUIN } from "@/lib/models";
+
 export default function Home() {
-  const [garments, setGarments] = useState<Garment[]>([]);
-  const [image, setImage] = useState<string | null>(null);
-  const [usage, setUsage] = useState<{
-    requests: number;
-    totalTokens: number;
-    costUsd: number | null;
-    modelLabel: string;
-    mocked: boolean;
-  } | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [email, setEmail] = useState("");
+  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [message, setMessage] = useState("");
 
-  function addGarment(g: Garment) {
-    setGarments((prev) => [...prev, g]);
-  }
-  function removeGarment(id: string) {
-    setGarments((prev) => prev.filter((g) => g.id !== id));
-  }
-  function changeType(id: string, type: GarmentType) {
-    setGarments((prev) => prev.map((g) => (g.id === id ? { ...g, type } : g)));
-  }
-  function moveGarment(id: string, dir: -1 | 1) {
-    setGarments((prev) => {
-      const i = prev.findIndex((g) => g.id === id);
-      const j = i + dir;
-      if (i < 0 || j < 0 || j >= prev.length) return prev;
-      const next = [...prev];
-      [next[i], next[j]] = [next[j], next[i]];
-      return next;
-    });
-  }
-
-  async function generate() {
-    if (garments.length === 0) return;
-    setLoading(true);
-    setError(null);
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!email.trim()) return;
+    setStatus("loading");
     try {
-      const res = await fetch("/api/tryon", {
+      const res = await fetch("/api/waitlist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          baseModel: MANNEQUIN,
-          garments: garments.map((g) => ({
-            imageUrl: g.imageUrl,
-            type: g.type,
-            label: g.label,
-          })),
-        }),
+        body: JSON.stringify({ email }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to generate the outfit.");
-      setImage(data.image);
-      setUsage(data.usage ?? null);
+      if (!res.ok) throw new Error(data.error || "Something went wrong.");
+      setStatus("success");
+      setMessage(data.message);
+      setEmail("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
-      setImage(null);
-      setUsage(null);
-    } finally {
-      setLoading(false);
+      setStatus("error");
+      setMessage(err instanceof Error ? err.message : "Something went wrong.");
     }
   }
 
-  // Preview the order garments will actually be layered in.
-  const layered = sortByLayer(garments);
-
   return (
-    <main className="mx-auto min-h-screen max-w-6xl px-4 py-8 text-gray-900">
-      <header className="mb-8">
-        <h1 className="text-2xl font-bold tracking-tight">Lookloop</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Add clothing from store links or uploads, then see the whole outfit on one model.
+    <main className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-gray-50 to-white px-4">
+      {/* Hero */}
+      <div className="mx-auto max-w-2xl text-center">
+        <h1 className="text-5xl font-bold tracking-tight text-gray-900 sm:text-6xl">
+          Lookloop
+        </h1>
+        <p className="mt-4 text-lg text-gray-500">
+          See how outfits look before you buy them.
         </p>
-      </header>
+        <p className="mt-2 text-sm text-gray-400">
+          Paste links to clothing from any store. Lookloop composites everything onto one model
+          so you can judge how items layer together.
+        </p>
+      </div>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
-        {/* Left column: controls */}
-        <div className="flex flex-col gap-4">
-          <AddGarmentForm onAdd={addGarment} garments={garments} />
-
-          {garments.length > 0 && (
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-gray-800">
-                  Outfit ({garments.length})
-                </h2>
-                <span className="text-xs text-gray-400">layered base → outer</span>
-              </div>
-              {layered.map((g, i) => (
-                <GarmentCard
-                  key={g.id}
-                  garment={g}
-                  index={i}
-                  count={layered.length}
-                  onChangeType={changeType}
-                  onMove={moveGarment}
-                  onRemove={removeGarment}
-                />
-              ))}
-            </div>
-          )}
-
-          <button
-            onClick={generate}
-            disabled={loading || garments.length === 0}
-            className="rounded-xl bg-gray-900 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-gray-800 disabled:opacity-40"
-          >
-            {loading ? "Generating…" : image ? "Regenerate outfit" : "Generate outfit"}
-          </button>
-          <p className="text-center text-[11px] text-gray-400">
-            {garments.length > 0
-              ? `All ${garments.length} garment${garments.length === 1 ? "" : "s"} are composed in one image request, billed to your OpenRouter credits. Layering follows item type.`
-              : "Your whole outfit is composed in a single image request, billed to your OpenRouter credits. Layering follows item type."}
-          </p>
-        </div>
-
-        {/* Right column: result */}
-        <ResultPanel
-          image={image}
-          usage={usage}
-          loading={loading}
-          error={error}
-          hasGarments={garments.length > 0}
+      {/* How it works */}
+      <div className="mt-16 grid max-w-lg grid-cols-1 gap-8 sm:grid-cols-3">
+        <Step
+          number="1"
+          title="Add items"
+          description="Paste store links or upload photos of clothing you're considering."
+        />
+        <Step
+          number="2"
+          title="One click"
+          description="Lookloop composes the full outfit onto a single model in one AI-generated image."
+        />
+        <Step
+          number="3"
+          title="Decide"
+          description="See how everything layers together before you spend a cent."
         />
       </div>
-      <DebugPanel garments={layered} />
+
+      {/* Email signup */}
+      <div className="mt-16 w-full max-w-md">
+        <form onSubmit={handleSubmit} className="flex flex-col items-center gap-3">
+          <label htmlFor="email" className="text-sm font-medium text-gray-700">
+            Get notified when we launch
+          </label>
+          <div className="flex w-full gap-2">
+            <input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (status === "error") setStatus("idle");
+              }}
+              placeholder="you@example.com"
+              required
+              className="min-w-0 flex-1 rounded-xl border border-black/10 bg-white px-4 py-3 text-sm text-gray-900 shadow-sm transition placeholder:text-gray-400 focus:border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200"
+            />
+            <button
+              type="submit"
+              disabled={status === "loading"}
+              className="shrink-0 rounded-xl bg-gray-900 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-gray-800 disabled:opacity-50"
+            >
+              {status === "loading" ? "…" : "Notify me"}
+            </button>
+          </div>
+          {message && (
+            <p
+              className={`text-sm ${
+                status === "success" ? "text-green-600" : "text-red-500"
+              }`}
+            >
+              {message}
+            </p>
+          )}
+        </form>
+        <p className="mt-4 text-center text-xs text-gray-400">
+          No spam. Just a one-time email when Lookloop is ready.
+        </p>
+      </div>
+
+      {/* Footer */}
+      <footer className="mt-auto pt-16 pb-8 text-xs text-gray-300">
+        © {new Date().getFullYear()} Lookloop
+      </footer>
     </main>
+  );
+}
+
+function Step({
+  number,
+  title,
+  description,
+}: {
+  number: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="flex flex-col items-center text-center">
+      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-900 text-sm font-bold text-white">
+        {number}
+      </div>
+      <h2 className="mt-3 text-sm font-semibold text-gray-800">{title}</h2>
+      <p className="mt-1 text-xs leading-relaxed text-gray-500">{description}</p>
+    </div>
   );
 }

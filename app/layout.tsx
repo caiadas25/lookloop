@@ -13,8 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Lookloop",
-  description: "Visualize a full outfit from store links on one model.",
+  title: "Lookloop — See how outfits look before you buy",
+  description:
+    "Paste links to clothing from any store and see the full outfit composited onto one model. Virtual try-on powered by AI.",
 };
 
 export default function RootLayout({

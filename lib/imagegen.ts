@@ -3,6 +3,7 @@ import path from "node:path";
 import type { GarmentType } from "./garments";
 import { IMAGE_GENERATION_SYSTEM_PROMPT } from "./image-prompts";
 import { MODEL_KEYS, MODEL_LABELS, type ModelKey } from "./model-options";
+import { buildOutfitPrompt } from "./outfit-prompt";
 
 export { MODEL_KEYS, type ModelKey };
 
@@ -92,53 +93,6 @@ function guessMime(src: string): string {
 
 function toDataUrl(img: ImageInput): string {
   return `data:${img.mimeType};base64,${img.data}`;
-}
-
-const ARTICLE: Record<GarmentType, string> = {
-  top: "top / shirt",
-  bottom: "bottoms (pants/skirt)",
-  dress: "dress",
-  jacket: "jacket / outerwear",
-  tie: "necktie",
-  shoes: "shoes",
-  accessory: "accessory",
-  hat: "hat / headwear",
-};
-
-/**
- * Build one prompt that composes the whole outfit in a single request.
- *
- * Reference photos are e-commerce HERO shots: a real model wearing the target
- * item ALONGSIDE other clothing, page text, and unrelated overlays. The model must
- * extract ONLY the named garment from each photo and ignore everything else.
- * `garments` are pre-sorted innermost→outermost.
- *
- * Restructured as numbered steps with strong extraction language to improve
- * adherence on weaker image models (Gemini Flash, etc.).
- */
-function buildOutfitPrompt(garments: OutfitGarment[], hasBaseImage: boolean): string {
-  const offset = hasBaseImage ? 2 : 1;
-
-  const subject = hasBaseImage
-    ? "The first image shows the target person. Keep their exact face, body, hair, and skin, on a plain light-gray studio background."
-    : "Generate one neutral, faceless, light-gray full-body mannequin standing front-facing on a seamless light-gray studio background. The mannequin should be slim, average height, with no facial features.";
-
-  const extractionSteps = garments.map(
-    (g, i) =>
-      `Step ${i + 2}: From image ${i + offset}, extract ONLY the ${ARTICLE[g.type]}. Ignore the person, all other clothing, shoes, accessories, page UI, measurement labels, price tags, captions, and watermarks. Copy the garment's exact colour, fabric, cut, length, collar style, sleeve length, stitching, buttons, seams, trims, pattern, print, embroidery, patches, and any logo or lettering physically attached to the garment. If the garment is pink, it stays pink. If it is denim, it stays denim. Do not simplify, change, or restyle it.`,
-  );
-
-  return [
-    subject,
-    `You are given ${garments.length + (hasBaseImage ? 1 : 0)} image(s). Images ${Array.from({ length: garments.length }, (_, i) => i + offset).join(", ")} are reference photos of individual garments on models. Each photo shows many items — you must extract ONLY the one named below from each.`,
-    "EXTRACTION STEPS (follow in order):",
-    ...extractionSteps,
-    `Step ${garments.length + 2}: Compose the extracted garments onto the mannequin as ONE outfit, layered from innermost to outermost in the order listed. Shirts go under jackets. Ties go over shirts. Bottoms sit at the waist.`,
-    `CRITICAL — Match each garment EXACTLY: same colour (do not recolour), same fabric texture, same cut, same length, same collar/sleeve style, same stitching, same trims, same patterns, and same garment-native logos or lettering when present. A pink polo shirt must appear as a pink polo, NOT a blue V-neck. A dark denim jacket must appear as a dark denim jacket, NOT disappear.`,
-    "Show the ENTIRE figure from head to feet, centred, full-length. Do not crop or zoom in.",
-    "Do NOT render unrelated text, captions, product labels, price tags, size labels, measurements, signatures, UI, or watermarks. Logos or text are allowed only when they are physically part of the target garment, and then they should be preserved faithfully.",
-    "Output only the final composed image.",
-  ].join("\n\n");
 }
 
 function isImageUrl(url: unknown): url is string {

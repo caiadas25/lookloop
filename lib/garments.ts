@@ -8,6 +8,7 @@ export const GARMENT_TYPES = [
   "tie",
   "shoes",
   "accessory",
+  "hat",
 ] as const;
 
 export type GarmentType = (typeof GARMENT_TYPES)[number];
@@ -31,6 +32,7 @@ export const GARMENT_TYPE_LABELS: Record<GarmentType, string> = {
   tie: "Tie",
   shoes: "Shoes",
   accessory: "Accessory",
+  hat: "Hat",
 };
 
 // Lower number = applied to the model first (closer to the skin).
@@ -42,7 +44,8 @@ const LAYER_ORDER: Record<GarmentType, number> = {
   shoes: 40,
   tie: 50,
   jacket: 60,
-  accessory: 70,
+  hat: 70,
+  accessory: 80,
 };
 
 /**

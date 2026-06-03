@@ -14,6 +14,7 @@ const ARTICLE: Record<GarmentType, string> = {
   tie: "necktie",
   shoes: "shoes",
   accessory: "accessory",
+  hat: "hat / headwear",
 };
 
 function buildOutfitPrompt(garments: Garment[]): string {

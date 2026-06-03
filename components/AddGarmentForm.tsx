@@ -1,12 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import {
-  GARMENT_TYPES,
-  GARMENT_TYPE_LABELS,
-  type Garment,
-  type GarmentType,
-} from "@/lib/garments";
+import type { Garment, GarmentType } from "@/lib/garments";
 
 interface Props {
   onAdd: (garment: Garment) => void;
@@ -25,9 +20,26 @@ function readFileAsDataUrl(file: File): Promise<string> {
   });
 }
 
+/** Primary card options shown by default. */
+const PRIMARY_CARDS: { type: GarmentType; label: string; icon: string }[] = [
+  { type: "top", label: "Top", icon: "👕" },
+  { type: "bottom", label: "Bottom", icon: "👖" },
+  { type: "shoes", label: "Shoes", icon: "👟" },
+  { type: "jacket", label: "Outer", icon: "🧥" },
+];
+
+/** Secondary options shown when "Other" is expanded. */
+const OTHER_CARDS: { type: GarmentType; label: string; icon: string }[] = [
+  { type: "dress", label: "Dress", icon: "👗" },
+  { type: "tie", label: "Tie", icon: "🎀" },
+  { type: "hat", label: "Hat", icon: "🧢" },
+  { type: "accessory", label: "Accessory", icon: "💍" },
+];
+
 export default function AddGarmentForm({ onAdd }: Props) {
-  const [url, setUrl] = useState("");
   const [type, setType] = useState<GarmentType>("top");
+  const [showOther, setShowOther] = useState(false);
+  const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,7 +58,7 @@ export default function AddGarmentForm({ onAdd }: Props) {
       onAdd({
         id: newId(),
         type,
-        label: data.title?.slice(0, 60) || GARMENT_TYPE_LABELS[type],
+        label: data.title?.slice(0, 60) || "",
         imageUrl: data.imageUrl,
         sourceUrl: url.trim(),
       });
@@ -67,7 +79,7 @@ export default function AddGarmentForm({ onAdd }: Props) {
       onAdd({
         id: newId(),
         type,
-        label: file.name.replace(/\.[^.]+$/, "").slice(0, 60) || GARMENT_TYPE_LABELS[type],
+        label: file.name.replace(/\.[^.]+$/, "").slice(0, 60),
         imageUrl: dataUrl,
       });
     } catch (err) {
@@ -77,24 +89,90 @@ export default function AddGarmentForm({ onAdd }: Props) {
     }
   }
 
+  function selectType(t: GarmentType) {
+    setType(t);
+    // If picking a primary type, collapse Other.
+    if (PRIMARY_CARDS.some((c) => c.type === t)) {
+      setShowOther(false);
+    }
+  }
+
+  function handleOtherClick() {
+    setShowOther((prev) => !prev);
+    // When expanding Other, don't change the selected type yet.
+  }
+
   return (
     <div className="rounded-xl border border-black/10 bg-white p-4 shadow-sm">
-      <h2 className="mb-3 text-sm font-semibold text-gray-800">Add a clothing item</h2>
+      <h2 className="mb-3 text-sm font-semibold text-gray-800">
+        Add a clothing item
+      </h2>
 
-      <label className="mb-1 block text-xs font-medium text-gray-500">Item type</label>
-      <select
-        value={type}
-        onChange={(e) => setType(e.target.value as GarmentType)}
-        className="mb-3 w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm text-gray-900"
-      >
-        {GARMENT_TYPES.map((t) => (
-          <option key={t} value={t}>
-            {GARMENT_TYPE_LABELS[t]}
-          </option>
-        ))}
-      </select>
+      {/* Type cards */}
+      <label className="mb-2 block text-xs font-medium text-gray-500">
+        What kind of item?
+      </label>
+      <div className="mb-2 grid grid-cols-5 gap-2">
+        {PRIMARY_CARDS.map((c) => {
+          const active = type === c.type && !showOther;
+          return (
+            <button
+              key={c.type}
+              type="button"
+              onClick={() => selectType(c.type)}
+              className={`flex flex-col items-center gap-1 rounded-xl border-2 px-2 py-3 text-center transition ${
+                active
+                  ? "border-gray-900 bg-gray-900 text-white"
+                  : "border-black/10 bg-gray-50 text-gray-700 hover:border-black/25"
+              }`}
+            >
+              <span className="text-2xl leading-none">{c.icon}</span>
+              <span className="text-[11px] font-medium">{c.label}</span>
+            </button>
+          );
+        })}
+        <button
+          type="button"
+          onClick={handleOtherClick}
+          className={`flex flex-col items-center gap-1 rounded-xl border-2 px-2 py-3 text-center transition ${
+            showOther
+              ? "border-gray-900 bg-gray-900 text-white"
+              : "border-black/10 bg-gray-50 text-gray-700 hover:border-black/25"
+          }`}
+        >
+          <span className="text-2xl leading-none">⋯</span>
+          <span className="text-[11px] font-medium">Other</span>
+        </button>
+      </div>
 
-      <label className="mb-1 block text-xs font-medium text-gray-500">Paste a store link</label>
+      {/* Other options (expandable) */}
+      {showOther && (
+        <div className="mb-3 grid grid-cols-4 gap-2">
+          {OTHER_CARDS.map((c) => {
+            const active = type === c.type;
+            return (
+              <button
+                key={c.type}
+                type="button"
+                onClick={() => selectType(c.type)}
+                className={`flex flex-col items-center gap-1 rounded-xl border-2 px-2 py-2.5 text-center transition ${
+                  active
+                    ? "border-gray-900 bg-gray-900 text-white"
+                    : "border-black/10 bg-gray-50 text-gray-700 hover:border-black/25"
+                }`}
+              >
+                <span className="text-lg leading-none">{c.icon}</span>
+                <span className="text-[10px] font-medium">{c.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* URL input */}
+      <label className="mb-1 block text-xs font-medium text-gray-500">
+        Paste a store link
+      </label>
       <div className="mb-3 flex gap-2">
         <input
           type="url"
@@ -114,10 +192,13 @@ export default function AddGarmentForm({ onAdd }: Props) {
         </button>
       </div>
 
+      {/* Divider */}
       <div className="mb-3 flex items-center gap-2 text-xs text-gray-400">
-        <span className="h-px flex-1 bg-black/10" /> or <span className="h-px flex-1 bg-black/10" />
+        <span className="h-px flex-1 bg-black/10" /> or{" "}
+        <span className="h-px flex-1 bg-black/10" />
       </div>
 
+      {/* Upload */}
       <label className="flex cursor-pointer items-center justify-center rounded-lg border border-dashed border-black/20 px-3 py-3 text-sm text-gray-600 hover:bg-gray-50">
         Upload an image
         <input

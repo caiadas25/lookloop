@@ -9,19 +9,13 @@ import {
 
 interface Props {
   garment: Garment;
-  index: number;
-  count: number;
   onChangeType: (id: string, type: GarmentType) => void;
-  onMove: (id: string, dir: -1 | 1) => void;
   onRemove: (id: string) => void;
 }
 
 export default function GarmentCard({
   garment,
-  index,
-  count,
   onChangeType,
-  onMove,
   onRemove,
 }: Props) {
   return (
@@ -47,24 +41,6 @@ export default function GarmentCard({
             </option>
           ))}
         </select>
-      </div>
-      <div className="flex flex-col gap-1">
-        <button
-          onClick={() => onMove(garment.id, -1)}
-          disabled={index === 0}
-          aria-label="Move up"
-          className="rounded-full border-2 border-[#151515] bg-[#fffaf0] px-2 text-xs font-black text-[#151515] transition hover:bg-[#62d8ff] disabled:opacity-30"
-        >
-          ↑
-        </button>
-        <button
-          onClick={() => onMove(garment.id, 1)}
-          disabled={index === count - 1}
-          aria-label="Move down"
-          className="rounded-full border-2 border-[#151515] bg-[#fffaf0] px-2 text-xs font-black text-[#151515] transition hover:bg-[#62d8ff] disabled:opacity-30"
-        >
-          ↓
-        </button>
       </div>
       <button
         onClick={() => onRemove(garment.id)}

@@ -6,12 +6,14 @@ import AddGarmentForm from "@/components/AddGarmentForm";
 import GarmentCard from "@/components/GarmentCard";
 import ResultPanel from "@/components/ResultPanel";
 import DebugPanel from "@/components/DebugPanel";
+import ModelPicker from "@/components/ModelPicker";
 import {
   DEFAULT_GENERATION_MODE,
   GENERATION_MODE_LABELS,
   type GenerationMode,
 } from "@/lib/generation-modes";
 import { sortByLayer, type Garment, type GarmentType } from "@/lib/garments";
+import { DEFAULT_MODEL, MODEL_LABELS, type ModelKey } from "@/lib/model-options";
 import { MANNEQUIN } from "@/lib/models";
 
 const workflow = ["Paste", "Upload", "Layer", "Generate"];
@@ -57,6 +59,10 @@ function generationCostNote(garmentCount: number, mode: GenerationMode): string 
   return "Estimated token cost: about 1 image request. Exact tokens appear after generation.";
 }
 
+function autoGenerationMode(garmentCount: number): GenerationMode {
+  return garmentCount <= 2 ? "single-pass" : "preprocessed";
+}
+
 export default function TryPage() {
   const [garments, setGarments] = useState<Garment[]>([]);
   const [image, setImage] = useState<string | null>(null);
@@ -76,6 +82,12 @@ export default function TryPage() {
   const [devMessage, setDevMessage] = useState<string | null>(null);
   const [generationMode, setGenerationMode] =
     useState<GenerationMode>(DEFAULT_GENERATION_MODE);
+  const [model, setModel] = useState<ModelKey>(DEFAULT_MODEL);
+  const [autoDevSettings, setAutoDevSettings] = useState(true);
+  const activeGenerationMode = autoDevSettings
+    ? autoGenerationMode(garments.length)
+    : generationMode;
+  const activeModel = autoDevSettings ? DEFAULT_MODEL : model;
 
   function addGarment(g: Garment) {
     setGarments((prev) => [...prev, g]);
@@ -85,16 +97,6 @@ export default function TryPage() {
   }
   function changeType(id: string, type: GarmentType) {
     setGarments((prev) => prev.map((g) => (g.id === id ? { ...g, type } : g)));
-  }
-  function moveGarment(id: string, dir: -1 | 1) {
-    setGarments((prev) => {
-      const i = prev.findIndex((g) => g.id === id);
-      const j = i + dir;
-      if (i < 0 || j < 0 || j >= prev.length) return prev;
-      const next = [...prev];
-      [next[i], next[j]] = [next[j], next[i]];
-      return next;
-    });
   }
 
   async function generate() {
@@ -108,7 +110,8 @@ export default function TryPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           baseModel: MANNEQUIN,
-          generationMode,
+          model: activeModel,
+          generationMode: activeGenerationMode,
           garments: garments.map((g) => ({
             imageUrl: g.imageUrl,
             type: g.type,
@@ -183,6 +186,24 @@ export default function TryPage() {
     setDevMessage("Cleared.");
   }
 
+  function applyAutoDevSettings() {
+    const nextMode = autoGenerationMode(garments.length);
+    setAutoDevSettings(true);
+    setDevMessage(
+      `Auto: ${GENERATION_MODE_LABELS[nextMode]} with ${MODEL_LABELS[DEFAULT_MODEL]}.`,
+    );
+  }
+
+  function selectModel(key: ModelKey) {
+    setAutoDevSettings(false);
+    setModel(key);
+  }
+
+  function selectGenerationMode(mode: GenerationMode) {
+    setAutoDevSettings(false);
+    setGenerationMode(mode);
+  }
+
   // Preview the order garments will actually be layered in.
   const layered = sortByLayer(garments);
 
@@ -234,6 +255,10 @@ export default function TryPage() {
             <AddGarmentForm onAdd={addGarment} garments={garments} />
 
             <section className="rounded-[1.6rem] border-2 border-[#151515] bg-[#fffaf0] p-4 shadow-[7px_7px_0_#151515]">
+              <ModelPicker selected={activeModel} onSelect={selectModel} />
+            </section>
+
+            <section className="rounded-[1.6rem] border-2 border-[#151515] bg-[#fffaf0] p-4 shadow-[7px_7px_0_#151515]">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div>
                   <p className="text-xs font-black uppercase text-[#746f67]">Layer stack</p>
@@ -248,14 +273,11 @@ export default function TryPage() {
 
               {garments.length > 0 ? (
                 <div className="flex flex-col gap-3">
-                  {layered.map((g, i) => (
+                  {layered.map((g) => (
                     <GarmentCard
                       key={g.id}
                       garment={g}
-                      index={i}
-                      count={layered.length}
                       onChangeType={changeType}
-                      onMove={moveGarment}
                       onRemove={removeGarment}
                     />
                   ))}
@@ -281,12 +303,12 @@ export default function TryPage() {
             </button>
             <p className="text-center text-[11px] font-bold leading-5 text-[#746f67]">
               {garments.length > 0
-                ? generationMode === "preprocessed"
+                ? activeGenerationMode === "preprocessed"
                   ? `Preprocessed mode extracts ${garments.length} garment cutout${garments.length === 1 ? "" : "s"} before final composition.`
                   : `All ${garments.length} garment${garments.length === 1 ? "" : "s"} are composed in one image request. Layering follows item type.`
                 : "Your whole outfit will be composed according to the selected generation mode."}
               <br />
-              {generationCostNote(garments.length, generationMode)}
+              {generationCostNote(garments.length, activeGenerationMode)}
             </p>
           </div>
 
@@ -301,7 +323,7 @@ export default function TryPage() {
 
         <DebugPanel
           garments={layered}
-          generationMode={generationMode}
+          generationMode={activeGenerationMode}
           preprocessedGarments={preprocessedGarments}
         />
       </div>
@@ -310,9 +332,13 @@ export default function TryPage() {
         <DevToolsToolbar
           loading={devLoading}
           message={devMessage}
-          generationMode={generationMode}
+          garmentCount={garments.length}
+          model={activeModel}
+          autoEnabled={autoDevSettings}
+          generationMode={activeGenerationMode}
+          onAuto={applyAutoDevSettings}
           onClear={clearFit}
-          onGenerationModeChange={setGenerationMode}
+          onGenerationModeChange={selectGenerationMode}
           onLoad={loadDevTestFit}
         />
       )}
@@ -323,18 +349,29 @@ export default function TryPage() {
 function DevToolsToolbar({
   loading,
   message,
+  garmentCount,
+  model,
+  autoEnabled,
   generationMode,
+  onAuto,
   onClear,
   onGenerationModeChange,
   onLoad,
 }: {
   loading: boolean;
   message: string | null;
+  garmentCount: number;
+  model: ModelKey;
+  autoEnabled: boolean;
   generationMode: GenerationMode;
+  onAuto: () => void;
   onClear: () => void;
   onGenerationModeChange: (mode: GenerationMode) => void;
   onLoad: () => void;
 }) {
+  const autoMode = autoGenerationMode(garmentCount);
+  const autoActive = autoEnabled && model === DEFAULT_MODEL && generationMode === autoMode;
+
   return (
     <div className="fixed inset-x-0 bottom-0 z-50 border-t-2 border-[#151515] bg-[#151515] px-4 py-3 text-white shadow-[0_-6px_0_#ff6bb5]">
       <div className="mx-auto flex max-w-7xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -352,6 +389,18 @@ function DevToolsToolbar({
         )}
 
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={onAuto}
+            disabled={loading}
+            className={`min-h-11 rounded-full border-2 border-white px-5 text-sm font-black transition hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-60 ${
+              autoActive
+                ? "bg-[#62d8ff] text-[#151515]"
+                : "bg-[#151515] text-white hover:bg-[#62d8ff] hover:text-[#151515]"
+            }`}
+          >
+            Auto
+          </button>
           <div className="flex rounded-full border-2 border-white bg-white p-1 text-xs font-black text-[#151515]">
             {(["single-pass", "preprocessed"] as const).map((mode) => (
               <button

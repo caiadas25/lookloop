@@ -19,12 +19,13 @@ export { MODEL_KEYS, type ModelKey };
 const MAX_IMAGE_BYTES = 7 * 1024 * 1024;
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
-// Map each model key to its OpenRouter model ID and the output modalities its
-// endpoint actually supports (Seedream is image-only; requesting "text" too 404s).
+// Map each model key to its OpenRouter model ID and output modalities.
 const OPENROUTER_MODELS: Record<ModelKey, { id: string; modalities: string[] }> = {
   gemini: { id: "google/gemini-2.5-flash-image", modalities: ["image", "text"] },
-  gpt: { id: "openai/gpt-5-image", modalities: ["image", "text"] },
-  seedream: { id: "bytedance-seed/seedream-4.5", modalities: ["image"] },
+  "nano-banana-2": {
+    id: "google/gemini-3.1-flash-image-preview",
+    modalities: ["image", "text"],
+  },
 };
 
 type OpenRouterModelConfig = (typeof OPENROUTER_MODELS)[ModelKey];

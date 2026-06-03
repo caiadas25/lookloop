@@ -3,13 +3,13 @@
 
 export const MODEL_OPTIONS = [
   { key: "gemini", label: "Gemini", sub: "2.5 Flash Image" },
-  { key: "gpt", label: "GPT", sub: "GPT-5 Image" },
-  { key: "seedream", label: "Seedream", sub: "4.5 Edit" },
+  { key: "nano-banana-2", label: "Nano Banana 2", sub: "Gemini 3.1 Flash Image Preview" },
 ] as const;
 
 export type ModelKey = (typeof MODEL_OPTIONS)[number]["key"];
 
 export const MODEL_KEYS = MODEL_OPTIONS.map((o) => o.key) as ModelKey[];
+export const DEFAULT_MODEL: ModelKey = "gemini";
 
 export const MODEL_LABELS: Record<ModelKey, string> = Object.fromEntries(
   MODEL_OPTIONS.map((o) => [o.key, `${o.label} (${o.sub})`]),

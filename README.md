@@ -11,7 +11,7 @@ together (e.g. a jacket over a shirt with a tie) before buying.
    a type (top, jacket, tie, bottoms, …).
 2. **Pick a base model** — a bundled mannequin, or upload a real front-facing photo
    for the most realistic result.
-3. **Choose an image model** — Gemini or GPT, selectable per generation.
+3. **Choose an image model** — Gemini or Nano Banana 2, selectable per generation.
 4. **Generate** — the items are sorted into layer order (skin-adjacent → outerwear)
    and applied one at a time, each edit stacking on the previous so layering reads
    correctly. You get an image you can regenerate or download.
@@ -24,7 +24,7 @@ key + credit balance covers multiple models. The UI lets you pick per generation
 | UI option | OpenRouter model        |
 | --------- | ----------------------- |
 | Gemini    | `google/gemini-2.5-flash-image` |
-| GPT       | `openai/gpt-5-image`    |
+| Nano Banana 2 | `google/gemini-3.1-flash-image-preview` |
 
 Both are image-**output** models that accept the base photo + garment image and
 return an edited composite (OpenAI-compatible `chat/completions` with

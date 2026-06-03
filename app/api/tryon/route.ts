@@ -7,6 +7,7 @@ import {
   type GenerationMode,
 } from "@/lib/generation-modes";
 import { GARMENT_TYPES, sortByLayer } from "@/lib/garments";
+import { DEFAULT_MODEL } from "@/lib/model-options";
 
 export const runtime = "nodejs";
 export const maxDuration = 300; // preprocessed mode can make one image call per garment
@@ -19,7 +20,7 @@ const garmentSchema = z.object({
 
 const schema = z.object({
   baseModel: z.string().min(1),
-  model: z.enum(MODEL_KEYS as [string, ...string[]]).default("gemini"),
+  model: z.enum(MODEL_KEYS as [string, ...string[]]).default(DEFAULT_MODEL),
   generationMode: z
     .enum(GENERATION_MODES as unknown as [string, ...string[]])
     .default(DEFAULT_GENERATION_MODE),

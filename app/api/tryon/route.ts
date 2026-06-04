@@ -5,10 +5,12 @@ import { composeOutfit, MODEL_KEYS } from "@/lib/imagegen";
 import {
   DEFAULT_GENERATION_MODE,
   GENERATION_MODES,
+  GENERATION_MODE_LABELS,
   type GenerationMode,
 } from "@/lib/generation-modes";
 import { GARMENT_TYPES, sortByLayer } from "@/lib/garments";
-import { DEFAULT_MODEL } from "@/lib/model-options";
+import { DEFAULT_MODEL, MODEL_LABELS } from "@/lib/model-options";
+import { recordUsageEvent } from "@/lib/usage-analytics";
 
 export const runtime = "nodejs";
 export const maxDuration = 300; // preprocessed mode can make one image call per garment
@@ -47,6 +49,7 @@ export async function POST(req: Request) {
     );
   }
 
+  const startedAt = Date.now();
   try {
     const ordered = sortByLayer(parsed.data.garments);
     const result = await composeOutfit(
@@ -55,9 +58,40 @@ export async function POST(req: Request) {
       parsed.data.model as (typeof MODEL_KEYS)[number],
       parsed.data.generationMode as GenerationMode,
     );
+
+    await recordUsageEvent({
+      outcome: "success",
+      requests: result.usage.requests,
+      totalTokens: result.usage.totalTokens,
+      costUsd: result.usage.costUsd,
+      model: result.usage.model,
+      modelLabel: result.usage.modelLabel,
+      generationMode: result.usage.generationMode,
+      generationModeLabel: result.usage.generationModeLabel,
+      garmentCount: ordered.length,
+      durationMs: Date.now() - startedAt,
+    }).catch(() => undefined);
+
     return NextResponse.json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to generate the outfit.";
+    const model = parsed.data.model as (typeof MODEL_KEYS)[number];
+    const generationMode = parsed.data.generationMode as GenerationMode;
+
+    await recordUsageEvent({
+      outcome: "error",
+      requests: 0,
+      totalTokens: 0,
+      costUsd: null,
+      model,
+      modelLabel: MODEL_LABELS[model],
+      generationMode,
+      generationModeLabel: GENERATION_MODE_LABELS[generationMode],
+      garmentCount: parsed.data.garments.length,
+      durationMs: Date.now() - startedAt,
+      error: message,
+    }).catch(() => undefined);
+
     return NextResponse.json({ error: message }, { status: 502 });
   }
 }

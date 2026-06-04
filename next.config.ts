@@ -7,6 +7,7 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: __dirname,
   },
+  devIndicators: isProduction ? false : { position: "bottom-right" },
   logging: isProduction
     ? false
     : {

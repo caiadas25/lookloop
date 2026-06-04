@@ -5,12 +5,43 @@ import { useState } from "react";
 import AddGarmentForm from "@/components/AddGarmentForm";
 import GarmentCard from "@/components/GarmentCard";
 import ResultPanel from "@/components/ResultPanel";
-import { DEFAULT_GENERATION_MODE } from "@/lib/generation-modes";
+import {
+  DEFAULT_GENERATION_MODE,
+  GENERATION_MODES,
+  GENERATION_MODE_LABELS,
+  type GenerationMode,
+} from "@/lib/generation-modes";
 import { sortByLayer, type Garment, type GarmentType } from "@/lib/garments";
-import { DEFAULT_MODEL } from "@/lib/model-options";
+import { DEFAULT_MODEL, MODEL_OPTIONS, type ModelKey } from "@/lib/model-options";
 import { MANNEQUIN } from "@/lib/models";
 
 const workflow = ["Paste", "Upload", "Layer", "Generate"];
+const SHOW_DEV_TOOLS = process.env.NODE_ENV === "development";
+
+const DEV_TEST_GARMENTS: { label: string; type: GarmentType; url: string }[] = [
+  {
+    label: "Bottom",
+    type: "bottom",
+    url: "https://www.uniqlo.com/eu-pt/en/products/E480302-000/00?colorDisplayCode=09&sizeDisplayCode=003",
+  },
+  {
+    label: "Top",
+    type: "top",
+    url: "https://www.uniqlo.com/eu-pt/en/products/E485473-000/00?colorDisplayCode=09&sizeDisplayCode=003",
+  },
+  {
+    label: "Jacket",
+    type: "jacket",
+    url: "https://www.uniqlo.com/eu-pt/en/products/E478557-000/00?colorDisplayCode=05&sizeDisplayCode=003",
+  },
+];
+
+function newGarmentId(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return Math.random().toString(36).slice(2, 10);
+}
 
 function canUseType(
   garments: Garment[],
@@ -30,8 +61,14 @@ function canUseType(
 
 export default function TryPage() {
   const [garments, setGarments] = useState<Garment[]>([]);
+  const [baseModel, setBaseModel] = useState(MANNEQUIN);
+  const [selectedModel, setSelectedModel] = useState<ModelKey>(DEFAULT_MODEL);
+  const [generationMode, setGenerationMode] =
+    useState<GenerationMode>(DEFAULT_GENERATION_MODE);
   const [image, setImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [devLoading, setDevLoading] = useState<string | null>(null);
+  const [devMessage, setDevMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   function addGarment(g: Garment) {
@@ -57,9 +94,9 @@ export default function TryPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          baseModel: MANNEQUIN,
-          model: DEFAULT_MODEL,
-          generationMode: DEFAULT_GENERATION_MODE,
+          baseModel,
+          model: selectedModel,
+          generationMode,
           garments: garments.map((g) => ({
             imageUrl: g.imageUrl,
             type: g.type,
@@ -76,6 +113,52 @@ export default function TryPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function loadSavedGarment(item: (typeof DEV_TEST_GARMENTS)[number]) {
+    if (!canUseType(garments, item.type)) {
+      setDevMessage("A dress replaces top and bottom pieces in the same outfit.");
+      return;
+    }
+
+    setDevLoading(item.label);
+    setDevMessage(null);
+    setError(null);
+    setImage(null);
+
+    try {
+      const loaded = await extractSavedGarment(item);
+      setGarments((prev) => (canUseType(prev, loaded.type) ? [...prev, loaded] : prev));
+      setDevMessage(`Added ${item.label.toLowerCase()}.`);
+    } catch (err) {
+      setDevMessage(err instanceof Error ? err.message : `Failed to load ${item.label}.`);
+    } finally {
+      setDevLoading(null);
+    }
+  }
+
+  async function loadSavedFit() {
+    setDevLoading("all");
+    setDevMessage(null);
+    setError(null);
+    setImage(null);
+
+    try {
+      const loaded = await Promise.all(DEV_TEST_GARMENTS.map(extractSavedGarment));
+      setGarments(loaded);
+      setDevMessage(`Loaded ${loaded.length} saved test pieces.`);
+    } catch (err) {
+      setDevMessage(err instanceof Error ? err.message : "Failed to load saved test fit.");
+    } finally {
+      setDevLoading(null);
+    }
+  }
+
+  function clearFit() {
+    setGarments([]);
+    setImage(null);
+    setError(null);
+    setDevMessage("Cleared.");
   }
 
   // Preview the order garments will actually be layered in.
@@ -126,6 +209,22 @@ export default function TryPage() {
         <div className="grid gap-6 lg:grid-cols-[minmax(340px,0.86fr)_minmax(0,1.14fr)]">
           <div className="flex flex-col gap-5">
             <AddGarmentForm onAdd={addGarment} garments={garments} />
+
+            {SHOW_DEV_TOOLS && (
+              <DevToolsPanel
+                baseModel={baseModel}
+                generationMode={generationMode}
+                selectedModel={selectedModel}
+                onBaseModelChange={setBaseModel}
+                onClear={clearFit}
+                onGenerationModeChange={setGenerationMode}
+                onLoadSavedFit={loadSavedFit}
+                onLoadSavedGarment={loadSavedGarment}
+                onModelChange={setSelectedModel}
+                loadingAction={devLoading}
+                message={devMessage}
+              />
+            )}
 
             <section className="rounded-[1.6rem] border-2 border-[#151515] bg-[#fffaf0] p-4 shadow-[7px_7px_0_#151515]">
               <div className="mb-4 flex items-center justify-between gap-3">
@@ -189,5 +288,221 @@ export default function TryPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+async function extractSavedGarment(
+  item: (typeof DEV_TEST_GARMENTS)[number],
+): Promise<Garment> {
+  const res = await fetch("/api/extract", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url: item.url }),
+  });
+  const data = (await res.json()) as {
+    imageUrl?: string;
+    title?: string;
+    error?: string;
+  };
+
+  if (!res.ok || !data.imageUrl) {
+    throw new Error(data.error || `Failed to load ${item.label}.`);
+  }
+
+  return {
+    id: newGarmentId(),
+    type: item.type,
+    label: data.title?.slice(0, 60) || item.label,
+    imageUrl: data.imageUrl,
+    sourceUrl: item.url,
+  };
+}
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error("Couldn't read that file."));
+    reader.readAsDataURL(file);
+  });
+}
+
+function DevToolsPanel({
+  baseModel,
+  generationMode,
+  selectedModel,
+  onBaseModelChange,
+  onClear,
+  onGenerationModeChange,
+  onLoadSavedFit,
+  onLoadSavedGarment,
+  onModelChange,
+  loadingAction,
+  message,
+}: {
+  baseModel: string;
+  generationMode: GenerationMode;
+  selectedModel: ModelKey;
+  onBaseModelChange: (value: string) => void;
+  onClear: () => void;
+  onGenerationModeChange: (value: GenerationMode) => void;
+  onLoadSavedFit: () => void;
+  onLoadSavedGarment: (item: (typeof DEV_TEST_GARMENTS)[number]) => void;
+  onModelChange: (value: ModelKey) => void;
+  loadingAction: string | null;
+  message: string | null;
+}) {
+  const isCustomBase = baseModel.startsWith("data:");
+
+  async function handleBaseUpload(file: File | undefined) {
+    if (!file) return;
+    onBaseModelChange(await readFileAsDataUrl(file));
+  }
+
+  return (
+    <section className="rounded-[1.6rem] border-2 border-[#151515] bg-[#62d8ff] p-4 shadow-[7px_7px_0_#151515]">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-black uppercase text-[#151515]/70">Local only</p>
+          <h2 className="text-xl font-black">Dev tools</h2>
+        </div>
+        <span className="rounded-full bg-[#151515] px-3 py-1 text-[11px] font-black uppercase text-white">
+          enabled
+        </span>
+      </div>
+
+      <div className="space-y-4">
+        <div>
+          <label className="mb-2 block text-xs font-black uppercase text-[#151515]/70">
+            Base model
+          </label>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <button
+              type="button"
+              onClick={() => onBaseModelChange(MANNEQUIN)}
+              className={`min-h-20 rounded-2xl border-2 px-3 text-sm font-black transition ${
+                baseModel === MANNEQUIN
+                  ? "border-[#151515] bg-[#151515] text-white shadow-[3px_3px_0_#ff6bb5]"
+                  : "border-[#151515]/25 bg-white text-[#151515] hover:border-[#151515]"
+              }`}
+            >
+              Mannequin
+            </button>
+            {isCustomBase && (
+              <div className="relative min-h-20 overflow-hidden rounded-2xl border-2 border-[#151515] bg-white">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={baseModel} alt="Custom base" className="h-full w-full object-cover" />
+                <span className="absolute inset-x-0 bottom-0 bg-[#151515]/80 py-1 text-center text-[10px] font-black uppercase text-white">
+                  custom
+                </span>
+              </div>
+            )}
+            <label className="flex min-h-20 cursor-pointer items-center justify-center rounded-2xl border-2 border-dashed border-[#151515]/40 bg-white px-3 text-center text-sm font-black text-[#151515] transition hover:border-[#151515]">
+              {isCustomBase ? "Replace photo" : "Upload photo"}
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => handleBaseUpload(e.target.files?.[0])}
+              />
+            </label>
+          </div>
+        </div>
+
+        <div>
+          <label className="mb-2 block text-xs font-black uppercase text-[#151515]/70">
+            Image model
+          </label>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {MODEL_OPTIONS.map((option) => (
+              <button
+                key={option.key}
+                type="button"
+                onClick={() => onModelChange(option.key)}
+                className={`min-h-16 rounded-2xl border-2 px-3 text-left transition ${
+                  selectedModel === option.key
+                    ? "border-[#151515] bg-[#f6ff70] shadow-[3px_3px_0_#151515]"
+                    : "border-[#151515]/25 bg-white hover:border-[#151515]"
+                }`}
+              >
+                <span className="block text-sm font-black">{option.label}</span>
+                <span className="block text-[11px] font-bold text-[#39352f]">{option.sub}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="mb-2 block text-xs font-black uppercase text-[#151515]/70">
+            Generation mode
+          </label>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {GENERATION_MODES.map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => onGenerationModeChange(mode)}
+                className={`min-h-12 rounded-2xl border-2 px-3 text-sm font-black transition ${
+                  generationMode === mode
+                    ? "border-[#151515] bg-[#ff6bb5] shadow-[3px_3px_0_#151515]"
+                    : "border-[#151515]/25 bg-white hover:border-[#151515]"
+                }`}
+              >
+                {GENERATION_MODE_LABELS[mode]}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <label className="block text-xs font-black uppercase text-[#151515]/70">
+              Saved URLs
+            </label>
+            <button
+              type="button"
+              onClick={onClear}
+              disabled={loadingAction !== null}
+              className="rounded-full border-2 border-[#151515] bg-white px-3 py-1 text-[11px] font-black uppercase text-[#151515] transition hover:bg-[#f6ff70] disabled:opacity-50"
+            >
+              Clear
+            </button>
+          </div>
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={onLoadSavedFit}
+              disabled={loadingAction !== null}
+              className="min-h-12 w-full rounded-2xl border-2 border-[#151515] bg-[#151515] px-3 text-sm font-black text-white transition hover:-translate-y-0.5 hover:bg-[#f6ff70] hover:text-[#151515] disabled:translate-y-0 disabled:opacity-60"
+            >
+              {loadingAction === "all" ? "Loading saved fit..." : "Load saved fit"}
+            </button>
+
+            <div className="grid gap-2 sm:grid-cols-3">
+              {DEV_TEST_GARMENTS.map((item) => (
+                <button
+                  key={item.url}
+                  type="button"
+                  onClick={() => onLoadSavedGarment(item)}
+                  disabled={loadingAction !== null}
+                  title={item.url}
+                  className="min-h-14 rounded-2xl border-2 border-[#151515]/25 bg-white px-3 text-left transition hover:border-[#151515] disabled:opacity-60"
+                >
+                  <span className="block text-sm font-black">{item.label}</span>
+                  <span className="block truncate text-[10px] font-bold text-[#39352f]">
+                    {loadingAction === item.label ? "Loading..." : "Add one click"}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+          {message && (
+            <p className="mt-2 rounded-2xl border-2 border-[#151515]/20 bg-white/70 px-3 py-2 text-xs font-black text-[#151515]">
+              {message}
+            </p>
+          )}
+        </div>
+      </div>
+    </section>
   );
 }

@@ -12,6 +12,22 @@ import { MANNEQUIN } from "@/lib/models";
 
 const workflow = ["Paste", "Upload", "Layer", "Generate"];
 
+function canUseType(
+  garments: Garment[],
+  type: GarmentType,
+  changingId?: string,
+): boolean {
+  const otherGarments = garments.filter((g) => g.id !== changingId);
+  const hasDress = otherGarments.some((g) => g.type === "dress");
+  const hasTopOrBottom = otherGarments.some(
+    (g) => g.type === "top" || g.type === "bottom",
+  );
+
+  if (hasDress && (type === "top" || type === "bottom")) return false;
+  if (hasTopOrBottom && type === "dress") return false;
+  return true;
+}
+
 export default function TryPage() {
   const [garments, setGarments] = useState<Garment[]>([]);
   const [image, setImage] = useState<string | null>(null);
@@ -19,13 +35,17 @@ export default function TryPage() {
   const [error, setError] = useState<string | null>(null);
 
   function addGarment(g: Garment) {
-    setGarments((prev) => [...prev, g]);
+    setGarments((prev) => (canUseType(prev, g.type) ? [...prev, g] : prev));
   }
   function removeGarment(id: string) {
     setGarments((prev) => prev.filter((g) => g.id !== id));
   }
   function changeType(id: string, type: GarmentType) {
-    setGarments((prev) => prev.map((g) => (g.id === id ? { ...g, type } : g)));
+    setGarments((prev) =>
+      canUseType(prev, type, id)
+        ? prev.map((g) => (g.id === id ? { ...g, type } : g))
+        : prev,
+    );
   }
 
   async function generate() {
@@ -60,6 +80,8 @@ export default function TryPage() {
 
   // Preview the order garments will actually be layered in.
   const layered = sortByLayer(garments);
+  const isTypeDisabledForGarment = (type: GarmentType, garment: Garment) =>
+    !canUseType(garments, type, garment.id);
 
   return (
     <main className="min-h-screen overflow-hidden bg-[#f8f4ec] text-[#151515]">
@@ -125,6 +147,7 @@ export default function TryPage() {
                       garment={g}
                       onChangeType={changeType}
                       onRemove={removeGarment}
+                      isTypeDisabled={isTypeDisabledForGarment}
                     />
                   ))}
                 </div>
@@ -134,7 +157,7 @@ export default function TryPage() {
                     Your outfit stack is empty.
                   </p>
                   <p className="mt-2 text-xs font-bold leading-5 text-[#746f67]">
-                    Add a top, bottom, shoes, or any chaos from your cart.
+                    Add a top, bottom, jacket, shoes, hat, or dress from your cart.
                   </p>
                 </div>
               )}

@@ -5,9 +5,7 @@ export const GARMENT_TYPES = [
   "bottom",
   "dress",
   "jacket",
-  "tie",
   "shoes",
-  "accessory",
   "hat",
 ] as const;
 
@@ -29,28 +27,23 @@ export const GARMENT_TYPE_LABELS: Record<GarmentType, string> = {
   bottom: "Bottom / Pants",
   dress: "Dress",
   jacket: "Jacket / Outerwear",
-  tie: "Tie",
   shoes: "Shoes",
-  accessory: "Accessory",
   hat: "Hat",
 };
 
 // Lower number = applied to the model first (closer to the skin).
-// Outerwear and accessories are layered last so they sit on top.
 const LAYER_ORDER: Record<GarmentType, number> = {
   dress: 10,
   top: 20,
   bottom: 30,
   shoes: 40,
-  tie: 50,
-  jacket: 60,
-  hat: 70,
-  accessory: 80,
+  jacket: 50,
+  hat: 60,
 };
 
 /**
  * Sort garments into the order they should be applied to the model so that
- * layering reads correctly (e.g. a jacket lands on top of a shirt and tie).
+ * layering reads correctly.
  * Stable: items of the same type keep their relative order.
  */
 export function sortByLayer<T extends { type: GarmentType }>(garments: T[]): T[] {

@@ -23,7 +23,7 @@ const howItWorks = [
   {
     number: "02",
     title: "Tell FitMashr what each item is",
-    text: "Tag tops, bottoms, shoes, jackets, dresses, and accessories so layers land in the right order.",
+    text: "Tag tops, bottoms, jackets, shoes, hats, or a dress so layers land in the right order.",
   },
   {
     number: "03",

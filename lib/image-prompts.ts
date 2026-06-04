@@ -5,6 +5,6 @@ export const IMAGE_GENERATION_SYSTEM_PROMPT = [
   "Do not add any readable text, numbers, labels, captions, signatures, watermarks, size/height annotations, or UI text anywhere in the final image unless it is physically part of a target garment.",
   "Remove unrelated text and graphics from the source images: captions, size labels, height labels, price tags, UI text, page chrome, watermarks, signatures, measurement overlays, and product-page labels.",
   "If text or a logo is printed, embroidered, patched, woven, or otherwise attached to the actual garment, preserve it as part of the garment detail.",
-  "Every listed target garment must appear in the final outfit, including outerwear layers such as jackets.",
+  "Every listed target garment must appear in the final outfit.",
   "The final output must be only the full-body outfit image on a clean studio background with no text in the background, margins, corners, or floor.",
 ].join("\\n");

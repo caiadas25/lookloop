@@ -1,20 +1,20 @@
 # Lookloop
 
 Paste links to clothing from online stores (or upload images) and see the whole
-outfit composited onto a single model — so you can judge how items look layered
-together (e.g. a jacket over a shirt with a tie) before buying.
+outfit composited onto a single model, so you can judge how items look together
+before buying.
 
 ## How it works
 
 1. **Add garments** — paste a store URL (the server scrapes the product image via
    Open Graph / JSON-LD / `<img>` tags) or upload an image directly. Each item gets
-   a type (top, jacket, tie, bottoms, …).
+   a type (top, bottom, jacket, shoes, hat, or dress).
 2. **Pick a base model** — a bundled mannequin, or upload a real front-facing photo
    for the most realistic result.
 3. **Choose an image model** — Gemini or Nano Banana 2, selectable per generation.
-4. **Generate** — the items are sorted into layer order (skin-adjacent → outerwear)
-   and applied one at a time, each edit stacking on the previous so layering reads
-   correctly. You get an image you can regenerate or download.
+4. **Generate** — the items are sorted into layer order and applied one at a time,
+   each edit stacking on the previous so layering reads correctly. You get an image
+   you can regenerate or download.
 
 ## Image generation (OpenRouter)
 
@@ -63,7 +63,7 @@ npm run dev                  # http://localhost:3000
 
 - Scraping arbitrary stores is best-effort; if a site blocks it, use the image
   upload fallback.
-- Try-on fidelity varies for fine items (ties, patterns); iterative editing can
+- Try-on fidelity varies for fine details and patterns; iterative editing can
   drift, so regenerate if a result looks off.
 - The bundled mannequins are stylized SVG placeholders — for realistic output,
   upload a real model photo as the base.

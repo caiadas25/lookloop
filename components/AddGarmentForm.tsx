@@ -32,20 +32,13 @@ function firstHttpUrl(value: string): string | null {
   }
 }
 
-/** Primary card options shown by default. */
-const PRIMARY_CARDS: { type: GarmentType; label: string; icon: string }[] = [
+const GARMENT_CARDS: { type: GarmentType; label: string; icon: string }[] = [
   { type: "top", label: "Top", icon: "👕" },
   { type: "bottom", label: "Bottom", icon: "👖" },
   { type: "shoes", label: "Shoes", icon: "👟" },
   { type: "jacket", label: "Outer", icon: "🧥" },
-];
-
-/** Secondary options shown when "Other" is expanded. */
-const OTHER_CARDS: { type: GarmentType; label: string; icon: string }[] = [
-  { type: "dress", label: "Dress", icon: "👗" },
-  { type: "tie", label: "Tie", icon: "👔" },
   { type: "hat", label: "Hat", icon: "🧢" },
-  { type: "accessory", label: "Accessory", icon: "💍" },
+  { type: "dress", label: "Dress", icon: "👗" },
 ];
 
 /** Count how many garments of each type exist. */
@@ -59,16 +52,32 @@ function countByType(garments: Garment[]): Partial<Record<GarmentType, number>> 
 
 export default function AddGarmentForm({ onAdd, garments }: Props) {
   const [type, setType] = useState<GarmentType>("top");
-  const [showOther, setShowOther] = useState(false);
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const counts = countByType(garments);
+  const hasDress = (counts.dress ?? 0) > 0;
+  const hasTopOrBottom = (counts.top ?? 0) > 0 || (counts.bottom ?? 0) > 0;
+
+  function isTypeDisabled(t: GarmentType): boolean {
+    if ((type === "dress" || hasDress) && (t === "top" || t === "bottom")) {
+      return true;
+    }
+    if (hasTopOrBottom && t === "dress") return true;
+    return false;
+  }
+
+  function guardSelectedType(): boolean {
+    if (!isTypeDisabled(type)) return true;
+    setError("A dress replaces top and bottom pieces in the same outfit.");
+    return false;
+  }
 
   async function addUrl(rawUrl: string) {
     const nextUrl = rawUrl.trim();
     if (!nextUrl) return;
+    if (!guardSelectedType()) return;
     setBusy(true);
     setError(null);
     try {
@@ -100,6 +109,7 @@ export default function AddGarmentForm({ onAdd, garments }: Props) {
 
   async function handleFile(file: File | undefined) {
     if (!file) return;
+    if (!guardSelectedType()) return;
     setBusy(true);
     setError(null);
     try {
@@ -195,14 +205,9 @@ export default function AddGarmentForm({ onAdd, garments }: Props) {
   }
 
   function selectType(t: GarmentType) {
+    if (isTypeDisabled(t)) return;
     setType(t);
-    if (PRIMARY_CARDS.some((c) => c.type === t)) {
-      setShowOther(false);
-    }
-  }
-
-  function handleOtherClick() {
-    setShowOther((prev) => !prev);
+    setError(null);
   }
 
   /**
@@ -210,10 +215,14 @@ export default function AddGarmentForm({ onAdd, garments }: Props) {
    *  - active: currently selected for the next add
    *  - used: has garments of this type in the outfit (but not selected now)
    */
-  function cardStyle(t: GarmentType, isOther = false): string {
-    const active = type === t && (isOther || !showOther);
+  function cardStyle(t: GarmentType): string {
+    const disabled = isTypeDisabled(t);
+    const active = type === t && !disabled;
     const used = (counts[t] ?? 0) > 0;
 
+    if (disabled) {
+      return "cursor-not-allowed border-[#151515]/15 bg-[#d8d2c6] text-[#746f67] opacity-60";
+    }
     if (active) {
       return "border-[#151515] bg-[#151515] text-white shadow-[3px_3px_0_#ff6bb5]";
     }
@@ -236,12 +245,13 @@ export default function AddGarmentForm({ onAdd, garments }: Props) {
       <label className="mb-2 block text-xs font-black uppercase text-[#746f67]">
         What kind of item?
       </label>
-      <div className="mb-2 grid grid-cols-5 gap-2">
-        {PRIMARY_CARDS.map((c) => (
+      <div className="mb-3 grid grid-cols-5 gap-2">
+        {GARMENT_CARDS.map((c) => (
           <button
             key={c.type}
-          type="button"
-          onClick={() => selectType(c.type)}
+            type="button"
+            onClick={() => selectType(c.type)}
+            disabled={isTypeDisabled(c.type)}
             className={`relative flex min-h-20 flex-col items-center justify-center gap-1 rounded-2xl border-2 px-2 py-3 text-center text-[#151515] transition ${cardStyle(c.type)}`}
           >
             {(counts[c.type] ?? 0) > 0 && (
@@ -253,40 +263,7 @@ export default function AddGarmentForm({ onAdd, garments }: Props) {
             <span className="text-[11px] font-black">{c.label}</span>
           </button>
         ))}
-        <button
-          type="button"
-          onClick={handleOtherClick}
-          className={`flex min-h-20 flex-col items-center justify-center gap-1 rounded-2xl border-2 px-2 py-3 text-center transition ${
-            showOther
-              ? "border-[#151515] bg-[#151515] text-white shadow-[3px_3px_0_#ff6bb5]"
-              : "border-[#151515]/25 bg-white text-[#39352f] hover:border-[#151515]"
-          }`}
-        >
-          <span className="text-2xl leading-none">⋯</span>
-          <span className="text-[11px] font-black">Other</span>
-        </button>
       </div>
-
-      {showOther && (
-        <div className="mb-3 grid grid-cols-4 gap-2">
-          {OTHER_CARDS.map((c) => (
-            <button
-              key={c.type}
-              type="button"
-              onClick={() => selectType(c.type)}
-              className={`relative flex min-h-16 flex-col items-center justify-center gap-1 rounded-2xl border-2 px-2 py-2.5 text-center transition ${cardStyle(c.type, true)}`}
-            >
-              {(counts[c.type] ?? 0) > 0 && (
-                <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-[#151515] bg-[#62d8ff] text-[9px] font-black text-[#151515]">
-                  ✓
-                </span>
-              )}
-              <span className="text-lg leading-none">{c.icon}</span>
-              <span className="text-[10px] font-black">{c.label}</span>
-            </button>
-          ))}
-        </div>
-      )}
 
       <label className="mb-1 block text-xs font-black uppercase text-[#746f67]">
         Paste a store link, image link, or clipboard photo

@@ -11,12 +11,14 @@ interface Props {
   garment: Garment;
   onChangeType: (id: string, type: GarmentType) => void;
   onRemove: (id: string) => void;
+  isTypeDisabled?: (type: GarmentType, garment: Garment) => boolean;
 }
 
 export default function GarmentCard({
   garment,
   onChangeType,
   onRemove,
+  isTypeDisabled,
 }: Props) {
   return (
     <div className="flex items-center gap-3 rounded-2xl border-2 border-[#151515] bg-white p-3 shadow-[4px_4px_0_#151515]">
@@ -36,7 +38,7 @@ export default function GarmentCard({
           className="mt-2 rounded-full border-2 border-[#151515] bg-[#f6ff70] px-3 py-1 text-xs font-black text-[#151515]"
         >
           {GARMENT_TYPES.map((t) => (
-            <option key={t} value={t}>
+            <option key={t} value={t} disabled={isTypeDisabled?.(t, garment) ?? false}>
               {GARMENT_TYPE_LABELS[t]}
             </option>
           ))}

@@ -1,16 +1,7 @@
 "use client";
 
-interface Usage {
-  requests: number;
-  totalTokens: number;
-  costUsd: number | null;
-  modelLabel: string;
-  generationModeLabel?: string;
-}
-
 interface Props {
   image: string | null;
-  usage: Usage | null;
   loading: boolean;
   error: string | null;
   hasGarments: boolean;
@@ -23,27 +14,7 @@ function download(image: string) {
   a.click();
 }
 
-function UsageNote({ usage }: { usage: Usage }) {
-  const tokenLabel = usage.totalTokens
-    ? `~${usage.totalTokens.toLocaleString()} tokens`
-    : null;
-  return (
-    <div className="w-full max-w-md rounded-2xl border-2 border-[#151515] bg-[#f6ff70] px-4 py-3 text-center text-xs font-bold text-[#39352f]">
-      <p className="font-black text-[#151515]">
-        {usage.modelLabel} · {usage.requests} image request{usage.requests === 1 ? "" : "s"}
-        {usage.generationModeLabel ? ` · ${usage.generationModeLabel}` : ""}
-        {tokenLabel ? ` · ${tokenLabel}` : ""}
-      </p>
-      <p className="mt-1">
-        {usage.costUsd != null
-          ? `Billed to your OpenRouter credits: about $${usage.costUsd.toFixed(4)} this generation.`
-          : "Billed to your OpenRouter credits for the selected model."}
-      </p>
-    </div>
-  );
-}
-
-export default function ResultPanel({ image, usage, loading, error, hasGarments }: Props) {
+export default function ResultPanel({ image, loading, error, hasGarments }: Props) {
   return (
     <section className="relative flex min-h-[38rem] flex-col items-center justify-center rounded-[2rem] border-2 border-[#151515] bg-[#fffaf0] p-4 shadow-[10px_10px_0_#151515] sm:p-6">
       <div className="absolute left-5 top-5 rounded-full border-2 border-[#151515] bg-[#62d8ff] px-3 py-1 text-xs font-black uppercase">
@@ -59,19 +30,10 @@ export default function ResultPanel({ image, usage, loading, error, hasGarments 
       ) : error ? (
         error.startsWith("BILLING_REQUIRED:") ? (
           <div className="max-w-sm rounded-2xl border-2 border-[#151515] bg-[#f6ff70] p-5 text-center shadow-[5px_5px_0_#151515]">
-            <p className="text-sm font-black text-[#151515]">Out of OpenRouter credits</p>
+            <p className="text-sm font-black text-[#151515]">Preview unavailable</p>
             <p className="mt-2 text-xs font-bold leading-relaxed text-[#39352f]">
-              This generation was rejected because your OpenRouter balance can&apos;t cover the
-              selected model. Top up your credits (or pick a cheaper model) and try again.
+              We couldn&apos;t create this fit preview right now. Please try again in a moment.
             </p>
-            <a
-              href="https://openrouter.ai/credits"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-3 inline-block rounded-full border-2 border-[#151515] bg-[#151515] px-4 py-2 text-xs font-black text-white hover:bg-[#ff6bb5] hover:text-[#151515]"
-            >
-              Manage OpenRouter credits
-            </a>
           </div>
         ) : (
           <p className="max-w-sm rounded-2xl border-2 border-[#151515] bg-[#ff6bb5] p-4 text-center text-sm font-black text-[#151515] shadow-[5px_5px_0_#151515]">
@@ -92,7 +54,6 @@ export default function ResultPanel({ image, usage, loading, error, hasGarments 
           >
             Download image
           </button>
-          {usage && <UsageNote usage={usage} />}
         </div>
       ) : (
         <div className="w-full max-w-md rounded-[1.5rem] border-2 border-dashed border-[#151515] bg-white/80 px-6 py-12 text-center">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ClipboardEvent } from "react";
 import type { Garment, GarmentType } from "@/lib/garments";
 
 interface Props {
@@ -101,6 +101,21 @@ export default function AddGarmentForm({ onAdd, garments }: Props) {
     }
   }
 
+  async function handlePaste(e: ClipboardEvent<HTMLElement>) {
+    if (busy) return;
+    const files = Array.from(e.clipboardData.files);
+    const file =
+      files.find((f) => f.type.startsWith("image/")) ??
+      Array.from(e.clipboardData.items)
+        .find((item) => item.kind === "file" && item.type.startsWith("image/"))
+        ?.getAsFile() ??
+      undefined;
+
+    if (!file) return;
+    e.preventDefault();
+    await handleFile(file);
+  }
+
   function selectType(t: GarmentType) {
     setType(t);
     if (PRIMARY_CARDS.some((c) => c.type === t)) {
@@ -131,7 +146,10 @@ export default function AddGarmentForm({ onAdd, garments }: Props) {
   }
 
   return (
-    <section className="rounded-[1.6rem] border-2 border-[#151515] bg-[#fffaf0] p-4 shadow-[7px_7px_0_#151515]">
+    <section
+      className="rounded-[1.6rem] border-2 border-[#151515] bg-[#fffaf0] p-4 shadow-[7px_7px_0_#151515]"
+      onPaste={handlePaste}
+    >
       <p className="text-xs font-black uppercase text-[#746f67]">Drop a piece</p>
       <h2 className="mb-4 text-xl font-black text-[#151515]">
         Add clothing
@@ -193,7 +211,7 @@ export default function AddGarmentForm({ onAdd, garments }: Props) {
       )}
 
       <label className="mb-1 block text-xs font-black uppercase text-[#746f67]">
-        Paste a store link
+        Paste a store or image link
       </label>
       <div className="mb-3 flex gap-2">
         <input
@@ -201,7 +219,7 @@ export default function AddGarmentForm({ onAdd, garments }: Props) {
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleUrlAdd()}
-          placeholder="https://store.com/product/..."
+          placeholder="https://store.com/product-or-image..."
           className="min-h-12 min-w-0 flex-1 rounded-2xl border-2 border-[#151515] bg-white px-4 text-sm font-bold text-[#151515] outline-none placeholder:text-[#746f67] focus:ring-2 focus:ring-[#ff6bb5]"
           disabled={busy}
         />
@@ -220,7 +238,7 @@ export default function AddGarmentForm({ onAdd, garments }: Props) {
       </div>
 
       <label className="flex min-h-14 cursor-pointer items-center justify-center rounded-2xl border-2 border-dashed border-[#151515] bg-[#62d8ff] px-3 py-3 text-sm font-black text-[#151515] transition hover:bg-[#f6ff70]">
-        Upload an image
+        Upload or paste an image
         <input
           type="file"
           accept="image/*"

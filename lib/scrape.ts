@@ -7,6 +7,13 @@ const FETCH_TIMEOUT_MS = 8000;
 const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 " +
   "(KHTML, like Gecko) Chrome/124.0 Safari/537.36";
+const REQUEST_HEADERS = {
+  "User-Agent": USER_AGENT,
+  Accept:
+    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+  "Accept-Language": "en-US,en;q=0.9",
+} as const;
+const IMAGE_EXT_RE = /\.(avif|gif|jpe?g|png|webp)(?:[?#]|$)/i;
 
 export interface ExtractedProduct {
   imageUrl: string;
@@ -59,19 +66,39 @@ async function assertSafeUrl(raw: string): Promise<URL> {
   return url;
 }
 
-/** Fetch a page's HTML with a timeout, size cap, and browser-like UA. */
-async function fetchHtml(url: URL): Promise<string> {
+function readableTitleFromUrl(url: URL): string {
+  const filename = decodeURIComponent(url.pathname.split("/").filter(Boolean).pop() ?? "");
+  const withoutExt = filename.replace(/\.[a-z0-9]+$/i, "");
+  const title = withoutExt.replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim();
+  return title || "Clothing item";
+}
+
+function looksLikeImageUrl(url: URL): boolean {
+  return IMAGE_EXT_RE.test(url.pathname);
+}
+
+function isImageContentType(contentType: string | null): boolean {
+  return contentType?.toLowerCase().split(";")[0].trim().startsWith("image/") ?? false;
+}
+
+async function fetchWithTimeout(url: URL): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(url, {
-      headers: { "User-Agent": USER_AGENT, Accept: "text/html,*/*" },
+    return await fetch(url, {
+      headers: REQUEST_HEADERS,
       redirect: "follow",
+      cache: "no-store",
       signal: controller.signal,
     });
-    if (!res.ok) {
-      throw new Error(`The store returned ${res.status}. It may be blocking automated requests.`);
-    }
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Read a page's HTML with a size cap. */
+async function readHtml(res: Response): Promise<string> {
+  try {
     const reader = res.body?.getReader();
     if (!reader) return await res.text();
     const chunks: Uint8Array[] = [];
@@ -89,8 +116,9 @@ async function fetchHtml(url: URL): Promise<string> {
       }
     }
     return Buffer.concat(chunks).toString("utf8");
-  } finally {
-    clearTimeout(timer);
+  } catch (err) {
+    res.body?.cancel();
+    throw err;
   }
 }
 
@@ -179,10 +207,34 @@ function imageFromJsonLd(raw: string): string | null {
 /** End-to-end: validate, fetch, and extract a product image from a store URL. */
 export async function extractProduct(rawUrl: string): Promise<ExtractedProduct> {
   const url = await assertSafeUrl(rawUrl);
-  const html = await fetchHtml(url);
+  const res = await fetchWithTimeout(url);
+  const finalUrl = new URL(res.url);
+  if (!res.ok) {
+    const subject = looksLikeImageUrl(url) ? "image link" : "store";
+    throw new Error(
+      `The ${subject} returned ${res.status}. Paste a direct product image link or upload the image instead.`,
+    );
+  }
+
+  if (isImageContentType(res.headers.get("content-type"))) {
+    res.body?.cancel();
+    return {
+      imageUrl: finalUrl.toString(),
+      title: readableTitleFromUrl(finalUrl),
+    };
+  }
+
+  if (looksLikeImageUrl(url)) {
+    res.body?.cancel();
+    throw new Error("That image link didn't return an image. Try uploading the image instead.");
+  }
+
+  const html = await readHtml(res);
   const product = extractFromHtml(html, url.toString());
   if (!product) {
-    throw new Error("Couldn't find a product image on that page. Try uploading an image instead.");
+    throw new Error(
+      "Couldn't find a product image on that page. Paste a direct product image link or upload the image instead.",
+    );
   }
   return product;
 }

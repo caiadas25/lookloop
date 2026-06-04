@@ -30,6 +30,17 @@ const percent = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 1,
 });
 
+function getNextPath(): string | null {
+  if (typeof window === "undefined") return null;
+
+  const requestedPath = new URLSearchParams(window.location.search).get("next");
+  if (!requestedPath || !requestedPath.startsWith("/") || requestedPath.startsWith("//")) {
+    return null;
+  }
+
+  return requestedPath === "/admin" ? null : requestedPath;
+}
+
 export default function AdminPage() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
   const [password, setPassword] = useState("");
@@ -109,6 +120,11 @@ export default function AdminPage() {
       if (!res.ok) throw new Error(data.error || "Login failed.");
       setPassword("");
       setAuthenticated(true);
+      const nextPath = getNextPath();
+      if (nextPath) {
+        window.location.href = nextPath;
+        return;
+      }
       await Promise.all([loadWaitlist(), loadStats(period)]);
     } catch (err) {
       setAuthError(err instanceof Error ? err.message : "Login failed.");

@@ -45,10 +45,10 @@ npm run dev                  # http://localhost:3000
   https://openrouter.ai/credits.
 - `OPENROUTER_API_KEY` is required in every environment. Local changes to
   `.env.local` require restarting `npm run dev`.
+- Local development always has access to the fit lab at `/try`, including the
+  extraction and try-on APIs.
 - Set `ADMIN_PASSWORD` and a long random `ADMIN_AUTH_SECRET` to enable the admin
-  session used for `/admin` and waitlist data. Admin sessions can also access `/try`.
-- Set `TESTER_PASSWORD` and a long random `TESTER_AUTH_SECRET` to enable tester
-  access for `/try`, `/api/extract`, and `/api/tryon` in production.
+  session used for `/admin`, waitlist data, and production access to `/try`.
 
 ## Architecture
 

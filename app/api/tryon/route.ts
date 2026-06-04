@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { isTesterCookieHeaderAuthenticated } from "@/lib/admin-auth";
+import { hasDevToolAccess } from "@/lib/dev-access";
 import { composeOutfit, MODEL_KEYS } from "@/lib/imagegen";
 import {
   DEFAULT_GENERATION_MODE,
@@ -32,7 +32,7 @@ const schema = z.object({
 });
 
 export async function POST(req: Request) {
-  if (!(await isTesterCookieHeaderAuthenticated(req.headers.get("cookie")))) {
+  if (!(await hasDevToolAccess(req.headers.get("cookie")))) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
 

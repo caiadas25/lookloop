@@ -1,4 +1,4 @@
-# Lookloop
+# FitMashr
 
 Paste links to clothing from online stores (or upload images) and see the whole
 outfit composited onto a single model, so you can judge how items look together
@@ -47,6 +47,9 @@ npm run dev                  # http://localhost:3000
   `.env.local` require restarting `npm run dev`.
 - Local development always has access to the fit lab at `/try`, including the
   extraction and try-on APIs.
+- Local usage analytics are recorded to `.next/dev/usage-events.json`, and local
+  waitlist signups are recorded to `.next/dev/waitlist.json`. Production usage
+  analytics and waitlist data require `KV_REST_API_URL` and `KV_REST_API_TOKEN`.
 - Set `ADMIN_PASSWORD` and a long random `ADMIN_AUTH_SECRET` to enable the admin
   session used for `/admin`, waitlist data, and production access to `/try`.
 

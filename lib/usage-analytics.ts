@@ -1,7 +1,11 @@
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import type { GenerationMode } from "./generation-modes";
 import type { ModelKey } from "./model-options";
 
 const USAGE_EVENTS_KEY = "analytics:generation-events";
+const LOCAL_USAGE_EVENTS_FILE = ".next/dev/usage-events.json";
+const LOCAL_USAGE_EVENT_LIMIT = 1000;
 
 export const USAGE_PERIODS = ["24h", "7d", "30d", "all"] as const;
 export type UsagePeriod = (typeof USAGE_PERIODS)[number];
@@ -66,9 +70,6 @@ async function getKv() {
 }
 
 export async function recordUsageEvent(input: UsageEventInput): Promise<void> {
-  const kv = await getKv();
-  if (!kv) return;
-
   const now = Date.now();
   const event: UsageEvent = {
     ...input,
@@ -76,16 +77,29 @@ export async function recordUsageEvent(input: UsageEventInput): Promise<void> {
     createdAt: new Date(now).toISOString(),
   };
 
-  await kv.zadd(USAGE_EVENTS_KEY, {
-    score: now,
-    member: JSON.stringify(event),
-  });
+  const kv = await getKv();
+  if (kv) {
+    await kv.zadd(USAGE_EVENTS_KEY, {
+      score: now,
+      member: JSON.stringify(event),
+    });
+    return;
+  }
+
+  if (canUseLocalUsageStore()) {
+    await appendLocalUsageEvent(event);
+  }
 }
 
 export async function getUsageStats(period: UsagePeriod): Promise<UsageStats> {
   const kv = await getKv();
   const now = new Date();
-  if (!kv) return emptyStats(period, now, false);
+  if (!kv) {
+    if (!canUseLocalUsageStore()) return emptyStats(period, now, false);
+
+    const events = filterEventsForPeriod(await readLocalUsageEvents(), period, now);
+    return buildStats(period, now, events, true);
+  }
 
   const startMs = getPeriodStartMs(period, now);
   const rawEvents = await kv.zrange<string[]>(
@@ -100,6 +114,58 @@ export async function getUsageStats(period: UsagePeriod): Promise<UsageStats> {
     .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
   return buildStats(period, now, events, true);
+}
+
+function canUseLocalUsageStore(): boolean {
+  return process.env.NODE_ENV === "development";
+}
+
+async function appendLocalUsageEvent(event: UsageEvent): Promise<void> {
+  const events = [...(await readLocalUsageEvents()), event]
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+    .slice(-LOCAL_USAGE_EVENT_LIMIT);
+  const file = getLocalUsageEventsFile();
+
+  await mkdir(dirname(file), { recursive: true });
+  await writeFile(file, `${JSON.stringify({ events }, null, 2)}\n`, "utf8");
+}
+
+async function readLocalUsageEvents(): Promise<UsageEvent[]> {
+  try {
+    const raw = await readFile(getLocalUsageEventsFile(), "utf8");
+    const parsed = JSON.parse(raw) as { events?: unknown };
+    const events = Array.isArray(parsed.events) ? parsed.events : [];
+
+    return events
+      .map(parseUsageEvent)
+      .filter((event): event is UsageEvent => event !== null)
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  } catch (err) {
+    if (
+      typeof err === "object" &&
+      err !== null &&
+      "code" in err &&
+      err.code === "ENOENT"
+    ) {
+      return [];
+    }
+    throw err;
+  }
+}
+
+function getLocalUsageEventsFile(): string {
+  return join(process.cwd(), LOCAL_USAGE_EVENTS_FILE);
+}
+
+function filterEventsForPeriod(
+  events: UsageEvent[],
+  period: UsagePeriod,
+  now: Date,
+): UsageEvent[] {
+  const startMs = getPeriodStartMs(period, now);
+  if (startMs === null) return events;
+
+  return events.filter((event) => new Date(event.createdAt).getTime() >= startMs);
 }
 
 function parseUsageEvent(raw: unknown): UsageEvent | null {

@@ -1,17 +1,10 @@
 import { NextResponse } from "next/server";
+import { addWaitlistEmail, getWaitlistCount } from "@/lib/waitlist-store";
 
 export const runtime = "nodejs";
 
 function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
-
-async function getKv() {
-  if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
-    return null;
-  }
-  const { kv } = await import("@vercel/kv");
-  return kv;
 }
 
 export async function POST(req: Request) {
@@ -36,22 +29,11 @@ export async function POST(req: Request) {
     );
   }
 
-  const kv = await getKv();
-  if (!kv) {
-    return NextResponse.json(
-      { error: "Waitlist is not configured yet. Please try again later." },
-      { status: 503 },
-    );
-  }
-
   try {
-    const existing = await kv.get<string>(`waitlist:${email}`);
-    if (existing) {
+    const result = await addWaitlistEmail(email);
+    if (result.alreadySubscribed) {
       return NextResponse.json({ message: "You're already on the list!" });
     }
-
-    await kv.set(`waitlist:${email}`, new Date().toISOString());
-    await kv.incr("waitlist:count");
 
     return NextResponse.json({
       message: "You're on the list! We'll notify you when FitMashr drops.",
@@ -63,12 +45,8 @@ export async function POST(req: Request) {
 }
 
 export async function GET() {
-  const kv = await getKv();
-  if (!kv) return NextResponse.json({ count: 0 });
-
   try {
-    const count = (await kv.get<number>("waitlist:count")) ?? 0;
-    return NextResponse.json({ count });
+    return NextResponse.json({ count: await getWaitlistCount() });
   } catch {
     return NextResponse.json({ count: 0 });
   }
